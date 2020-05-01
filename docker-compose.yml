@@ -1,293 +1,160 @@
 version: '3.4'
 
-
-
 networks:
-
   frontend:
-
   backend:
 
-
-
 services:
-
   catalog:
-
     image: events/catalogapi
-
     build:
-
       context: .\ProductCatalogApi
-
       dockerfile: Dockerfile
-
     environment:
-
       DatabaseServer: mssqlserver
-
       DatabaseName: eventCatalogDb
-
       DatabaseUser: sa
-
       DatabasePassword: ProductApi(!)
-
-      ExternalCatalogBaseUrl: http://localhost:6000
-
+      ExternalCatalogBaseUrl: http://localhost:6020
     ports:
-
-      - "6000:80"
-
-    container_name: eventscatalogapi
-
+      - "6020:80"
+    container_name: jewelscatalogapi
     networks:
-
       - backend
-
       - frontend
-
     depends_on:
-
       - mssqlserver
 
-
-
-  mssqlserver:
-
-    image: "microsoft/mssql-server-linux:latest"
-
-    environment:
-
-      ACCEPT_EULA: Y
-
-      SA_PASSWORD: ProductApi(!)
-
-    ports:
-
-      - "1445:1433"
-
-    container_name: eventssqlserver
-
-    networks:
-
-      - backend
-
-
-
-  tokenserver:
-
-    build:
-
-      context: .\TokenServiceApi
-
-      dockerfile: Dockerfile
-
-    image: events/tokenapi
-
-    logging:
-
-      driver: "json-file"
-
-      options:
-
-        max-size: "200k"
-
-        max-file: "10"
-
-    environment:
-
-      ASPNETCORE_ENVIRONMENT: Development
-
-      MvcClient: http://localhost:5220
-
-    ports:
-
-      - "6500:80"
-
-    container_name: tokenserviceapi
-
-    networks:
-
-      - backend
-
-      - frontend
-
-    depends_on:
-
-      - mssqlserver
   cart:
-
     build:
-
       context: .\CartApi
-
       dockerfile: Dockerfile
-
     image: events/cartapi
     logging:
-
       driver: "json-file"
-
       options:
-
         max-size: "200k"
-
         max-file: "10"
-
     environment:
-
-      IdentityUrl: http://192.168.0.41:6500
-
+      ASPNETCORE_ENVIRONMENT: Development
+      IdentityUrl: http://192.168.1.17:6720
       ConnectionString: basket.data
-
     ports:
-
       - "6801:80"
-
     container_name: cartapi
-
     networks:
-
       - backend
-
       - frontend
-
     depends_on:
-
       - basket.data
-
       - tokenserver
       - rabbitmq
 
   order:
-
     build:
-
       context: .\OrderApi
-
       dockerfile: Dockerfile
-
-    image: events/orderapi
-
+    image: jewels/orderapi
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
     environment:
-
-      IdentityUrl: http://192.168.0.41:6700
-
+      ASPNETCORE_ENVIRONMENT: Development
+      IdentityUrl: http://192.168.1.17:6720
       DatabaseServer: mssqlserver
-
       DatabaseName: OrdersDb
-
       DatabaseUser: sa
-
       DatabasePassword: ProductApi(!)
-
     ports:
-
       - "6802:80"
-
     container_name: orderapi
-
     networks:
-
       - backend
-
       - frontend
-
     depends_on:
-
       - mssqlserver
-
       - tokenserver
-
       - rabbitmq
 
 
-
-  webmvc:
-
-    build: 
-
-      context: .\webmvc
-
-      dockerfile: Dockerfile
-
-    image: events/webmvc
-
-    container_name: webshopp
-
+  mssqlserver:
+    image: "microsoft/mssql-server-linux:latest"
     environment:
-
-      ASPNETCORE_ENVIRONMENT: Development
-
-      CatalogUrl: http://catalog
-
-      IdentityUrl: http://192.168.0.41:6500
-
-      CallBackUrl: http://localhost:5220
-      CartUrl: http://cart
-
-      OrderUrl: http://order
-
-      StripePublicKey: pk_test_jZlpubvlPmcV6QJPReImelQy
-
-      StripePrivateKey: sk_test_bSHT9qxwjpyCOP0qdAvHLfAA
-
+      ACCEPT_EULA: Y
+      SA_PASSWORD: ProductApi(!)
     ports:
-
-      - "5220:80"
-
+      - "1445:1433"
+    container_name: eventssqlserver
     networks:
-
-      - frontend
-
-    depends_on:
-
-      - catalog
-
-      - cart
-
-      - order
-
-      - tokenserver
-
-
-
-  basket.data:
-
-    image: redis
-
-    container_name: basketdata
-
-    ports:
-
-      - "6080:6379"
-
-    networks:
-
       - backend
 
+  tokenserver:
+    build:
+      context: .\TokenServiceApi
+      dockerfile: Dockerfile
+    image: events/tokenapi
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      MvcClient: http://localhost:5220
+      BasketApiClient: https://localhost:6801
+    ports:
+      - "6720:80"
+    container_name: tokenserviceapi
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      - mssqlserver
 
+  webmvc:
+    build: 
+      context: .\webmvc
+      dockerfile: Dockerfile
+    image: events/webmvc
+    container_name: webshop
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      CatalogUrl: http://catalog
+      IdentityUrl: http://192.168.1.17:6720
+      CallBackUrl: http://localhost:5220
+      CartUrl: http://cart
+      OrderUrl: http://order
+      StripePublicKey: pk_test_GvFzBd5AeD9yn2BcyWQvr9z500W7JIO11B
+      StripePrivateKey: sk_test_NGDKJmohWcqTojkMeGGjS0cI00oz2r11c5
+    ports:
+      - "5220:80"
+    networks:
+      - frontend
+    depends_on:
+      - catalog
+      - cart
+      - order
+      - tokenserver
+
+  basket.data:
+    image: redis
+    container_name: basketdata
+    ports:
+      - "6080:6379"
+    networks:
+      - backend
 
   rabbitmq:
-
     image: rabbitmq:3-management
-
     container_name: rabbitmq
-
     hostname: myrabbitmq
-
     ports:
-
       - "15672:15672"
-
       - "5672:5672"
-
       - "5671:5671"
-
     volumes:
-
       - ~/rabbitmq:/var/lib/rabbitmq/mnesia   
-
     networks:
-
       - backend 
